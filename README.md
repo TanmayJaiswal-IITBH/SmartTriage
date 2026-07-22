@@ -1,11 +1,3 @@
-I completely understand the frustration. The chat interface automatically injects those "Bash" and "Code snippet" labels whenever it sees traditional markdown code formatting, which ruins the text when you try to highlight and copy it.
-
-To bypass the UI completely, I have rewritten the entire `README.md` file below using **indentation for the code blocks instead of backticks**. This is standard Markdown that GitHub will read perfectly, but it prevents the chat window from adding those annoying labels.
-
-You can highlight and copy everything below this line directly into your file:
-
----
-
 # SmartTriage
 
 An intelligent GitHub bot that automates issue triage and PR reviewer assignment using vector similarity search and commit history analysis for OpenLake repositories.
