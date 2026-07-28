@@ -1,4 +1,4 @@
-# 🤝 Contributing to CanonForces
+# 🤝 Contributing to Smart-Triage
 
 We love contributions! Here’s how you can help:
 
