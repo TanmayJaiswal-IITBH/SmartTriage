@@ -28,7 +28,8 @@ class settings(BaseSettings):
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     CHROMA_PATH: str = "./data/chroma"
     COLLECTION_NAME: str = "openlake_issues"
-    DIRECTORY_FALLBACK_WEIGHT: Final[float] = 0.8
+    DIRECTORY_FALLBACK_WEIGHT: Final[float] = 0.8 # The penalty applied when traversing up to a parent directory
+    HALF_LIFE_DAYS: Final[int] = 180 # The number of days until a commit's relevance score is cut in half
 
     # --- Duplicate detection tuning ---
     SIMILARITY_THRESHOLD: float = Field(default=0.85, ge=0.0, le=1.0)

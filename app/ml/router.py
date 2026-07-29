@@ -1,35 +1,58 @@
 import logging
+import math
 import os
 from collections import defaultdict
-from typing import Final
+from datetime import datetime, timezone
+from typing import Any, Final
 from app.config import Setting
 from app.ml.schemas import PRMetadata, ReviewerRecommendation, ReviewerScore
 
 logger = logging.getLogger(__name__)
 
-# Replaces the magic number with a clear, configurable constant
-
 
 class CodeGraph:
     """
     Represents the repository's file structure and contributor history as a graph.
-    
-    Nodes: 
-        - Files (e.g., 'src/auth/login.tsx')
-        - Directories (e.g., 'src/auth')
-        - Developers (e.g., 'alice')
-    Edges:
-        - Developer -> File (Weight: computed based on commits/lines changed)
-        - Directory -> File (Hierarchical parent-child relationship)
+    Now equipped with Exponential Time Decay to phase out inactive contributors.
     """
     def __init__(self):
         # Maps a specific file to its contributors and their ownership scores
-        # Format: { "filepath": { "developer_name": score } }
         self.file_authors: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
         
         # Maps a directory to its contributors (aggregated from child files)
-        # Used for BFS fallback when a PR creates a brand new file
         self.dir_authors: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+
+
+    @staticmethod
+    def _calculate_decayed_weight(
+        commit_date_str: str, 
+        base_weight: float = 1.0, 
+        half_life_days: int = Setting.HALF_LIFE_DAYS
+    ) -> float:
+        """
+        Calculates the time-decayed weight of a commit using exponential decay.
+        """
+        try:
+            # Handle standard ISO-8601 strings from GitHub, replacing 'Z' with explicit UTC offset
+            commit_date = datetime.fromisoformat(commit_date_str.replace("Z", "+00:00"))
+            
+            # Ensure it's timezone aware to prevent subtraction errors
+            if commit_date.tzinfo is None:
+                commit_date = commit_date.replace(tzinfo=timezone.utc)
+                
+            now = datetime.now(timezone.utc)
+            delta_t = max(0, (now - commit_date).days)
+            
+            # Lambda = ln(2) / half_life
+            decay_constant = math.log(2) / half_life_days
+            decayed_weight = base_weight * math.exp(-decay_constant * delta_t)
+            
+            return decayed_weight
+            
+        except (ValueError, TypeError):
+            logger.warning("Invalid date format: '%s'. Applying no time decay.", commit_date_str)
+            return base_weight
+
 
     def _get_parent_directories(self, filepath: str) -> list[str]:
         """
@@ -45,16 +68,27 @@ class CodeGraph:
             
         return parents
 
-    def add_commit(self, filepath: str, author: str, weight: float = 1.0) -> None:
+
+    def add_commit(
+        self, 
+        filepath: str, 
+        author: str, 
+        weight: float = 1.0,
+        commit_date_str: str | None = None
+    ) -> None:
         """
         Adds a commit to the graph, establishing an edge between the author and the file.
-        Also updates the parent directory nodes to reflect domain expertise.
+        Dynamically calculates time decay if a commit date is provided.
         """
         if weight <= 0:
             raise ValueError(f"Commit weight must be strictly positive, got {weight}")
             
         if not filepath or not author:
             return
+
+        # Apply exponential time decay if a date is provided
+        if commit_date_str:
+            weight = self._calculate_decayed_weight(commit_date_str, base_weight=weight)
 
         # 1. Add direct edge from author to file
         self.file_authors[filepath][author] += weight
@@ -63,11 +97,11 @@ class CodeGraph:
         for directory in self._get_parent_directories(filepath):
             self.dir_authors[directory][author] += weight
 
+
     def get_candidate_authors(self, filepath: str) -> dict[str, float]:
         """
         Returns a dictionary of author scores for a given file.
         If the file is new, traverses up the directory tree to find domain experts.
-        This hides the graph's internal traversal details from the Router.
         """
         # Case A: We have direct history for this exact file
         if filepath in self.file_authors:
@@ -88,26 +122,25 @@ class CodeGraph:
             
         return candidates
 
+
 class PRReviewerRouter:
     """
     Service class responsible for determining the best code reviewers for a Pull Request.
     """
     def __init__(self):
-        # In a real production app, you might load this graph from a database or 
-        # dynamically construct it by querying the GitHub API for git blame/history.
         self.repo_graphs: dict[str, CodeGraph] = defaultdict(CodeGraph)
         logger.info("Initialized PR Reviewer Router.")
+
 
     def ingest_repository_history(
         self, 
         repo_name: str, 
-        commits: list[dict[str, str | float]], 
+        commits: list[dict[str, Any]], 
         overwrite: bool = False
     ) -> None:
         """
         Populates the graph for a specific repository. 
-        Expects a list of dictionaries containing 'file', 'author', and optional 'weight'.
-        Allows overwriting existing history if requested.
+        Expects a list of dictionaries containing 'file', 'author', optional 'weight', and 'date'.
         """
         logger.info("Ingesting history for repository '%s' (Commits: %d)", repo_name, len(commits))
         
@@ -120,15 +153,17 @@ class PRReviewerRouter:
         for commit in commits:
             filepath = str(commit.get('file', ''))
             author = str(commit.get('author', ''))
+            date_str = commit.get('date')  # ISO-8601 string
             
             try:
                 weight = float(commit.get('weight', 1.0))
                 if weight > 0:
-                    graph.add_commit(filepath, author, weight)
+                    graph.add_commit(filepath, author, weight, commit_date_str=date_str)
                 else:
                     logger.warning("Ignored commit by %s with non-positive weight: %s", author, weight)
             except (ValueError, TypeError):
                 logger.warning("Ignored commit by %s due to invalid weight value", author)
+
 
     def recommend_reviewers(
         self, 
@@ -156,7 +191,6 @@ class PRReviewerRouter:
             logger.warning("No history found for repository '%s'.", repo_name)
             return ReviewerRecommendation(suggested_reviewers=[])
 
-        # Tracks accumulated scores for all potential reviewers
         candidate_scores: dict[str, float] = defaultdict(float)
 
         for filepath in changed_files:
