@@ -13,3 +13,7 @@ sentence-transformers>=5.1,<6.0
 pandas>=2.2,<3.0
 matplotlib>=3.9,<4.0
 seaborn>=0.13,<1.0
+
+langchain-google-genai>=4.3,<5.0
+ipykernel>=7.3,<8.0
+dotenv
