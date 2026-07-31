@@ -1,14 +1,3 @@
-"""
-Fetches issues from specified OpenLake repositories via the GitHub CLI,
-and generates pairwise combinations within each repo for manual
-duplicate-vs-not labeling (feeds threshold_eda.ipynb).
-
-Cross-repo pairs are intentionally NOT generated — an issue from repo A
-can never be a "duplicate" of an issue in repo B, so those pairs would
-just be wasted negative examples with zero signal.
-
-"""
-
 import csv
 import itertools
 import json
