@@ -23,6 +23,7 @@ class settings(BaseSettings):
     GITHUB_APP_ID: int
     GITHUB_PRIVATE_KEY_PATH: Path
     GITHUB_WEBHOOK_SECRET: str
+    GITHUB_APP_INSTALLATION_ID: int
 
     # --- ML / Vector DB config (owned by the Architect side, DO NOT rename) ---
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
