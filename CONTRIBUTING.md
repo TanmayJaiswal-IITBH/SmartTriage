@@ -38,6 +38,6 @@ We love contributions! Here’s how you can help:
 ## 📬 Communication
 For discussions, open an issue or reach out to the maintainers:  
 - [Tanmay Jaiswal](https://github.com/TanmayJaiswal-IITBH)
-- [@sujal-som22](https://github.com/sujal-som22)  
+- [Sujal Som](https://github.com/sujalsom22)  
 
 - Join our community on **Discord**: [https://discord.com/invite/ypxqsYpwzx](https://discord.com/invite/ypxqsYpwzx)  
