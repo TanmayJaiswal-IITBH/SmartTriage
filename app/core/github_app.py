@@ -13,10 +13,11 @@ class GithubAppClient:
         
         self._token_cache = {}
 
-    def get_client(self, installation_id: int = None) -> Github:
+    async def get_client(self, installation_id: int = None) -> Github:
         """
         Returns an authenticated Github client for the given installation.
         Utilizes caching to prevent unnecessary API calls and rate-limiting.
+        Uses asyncio.to_thread to prevent PyGithub from blocking the FastAPI event loop.
         """
         target_id = installation_id or self.config.GITHUB_APP_INSTALLATION_ID
         now_utc = datetime.now(timezone.utc)
@@ -28,10 +29,10 @@ class GithubAppClient:
             if cached["expires_at"] > now_utc + safety_buffer:
                 return cached["client"]
 
-        installation = self.integration.get_installation(target_id)   
-        token_auth = installation.get_installation_auth()   
+        installation = await asyncio.to_thread(self.integration.get_installation, target_id)
+        token_auth = await asyncio.to_thread(installation.get_installation_auth)
         gh = Github(auth=token_auth)
-        
+
         self._token_cache[target_id] = {
             "client": gh,
             "token": token_auth.token,
