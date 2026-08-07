@@ -1,11 +1,10 @@
-import aysncio
 import hmac
 import hashlib
 import json
 from fastapi import Request, HTTPException
 from config import Setting
 
-async def verify_github_webhook_signature(request: Request):
+def verify_github_webhook_signature(request: Request):
     """
     Verifies the GitHub webhook signature.
     """
@@ -13,7 +12,7 @@ async def verify_github_webhook_signature(request: Request):
     if not signature:
         raise HTTPException(status_code=401, detail="Unauthorized: Missing signature header")
 
-    raw_body = await request.body()
+    raw_body = request.body()
 
     secret = Setting.GITHUB_WEBHOOK_SECRET
     computed_signature = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
